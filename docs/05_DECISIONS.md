@@ -104,3 +104,71 @@ A new feature should only be added if it clearly improves one of the following:
 - the user's confidence in long-term progress
 
 If it does not strengthen the core loop, it should remain out of scope.
+
+---
+
+## Decision 012 — Provider API key management
+
+AI Provider API keys are stored only in a local `.env.local` file and are never committed to the repository (excluded via `.gitignore`). This applies to any current or future provider (e.g. `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`), not to one provider specifically — the decision is bound to "AI Provider," not to a brand.
+
+The browser frontend never holds or calls a provider API key directly. All calls to an AI provider are made server-side, through a Next.js Route Handler (`app/api/planning/route.ts`) that delegates to the Planning Engine, which in turn delegates to the active AI Adapter (see Decision 014 for how the active adapter is selected).
+
+Call direction is one-way: Route Handler → Planning Engine → AI Adapter → Provider API. An AI Adapter never calls back into a Route Handler.
+
+---
+
+## Decision 013 — Context assembly happens client-side in Phase 1 (temporary, local-first constraint)
+
+Because Phase 1 storage is local-first and lives in the browser (IndexedDB), the Planning Engine cannot read storage directly from the server. As a result, in M1:
+
+- `core/context` (`assembleContext()`) is called from the client, where IndexedDB is available.
+- The assembled `PlanningContextSnapshot` is sent as part of the request body to `/api/planning`.
+- `/api/planning` only validates the shape of the incoming context and forwards it to `core/planning-engine`. It does not assemble context itself and does not read storage.
+- `core/planning-engine` receives the context as input and calls `ai-adapter` with it; it has no knowledge of where the context came from.
+
+This is a direct consequence of the local-first storage decision, not a deviation from the layered architecture: the Route Handler remains the sole entry point to the AI Adapter, and the Planning Engine remains the sole caller of the AI Adapter.
+
+This decision should be revisited if Phase 1 storage ever moves server-side (e.g. a real backend database) — at that point, context assembly could move behind the Route Handler instead of being assembled client-side. Until then, future milestones (especially M5 — Planning Context and Persistence) should follow this same client-assembles-context, server-validates-and-forwards pattern rather than introducing a second, inconsistent pattern.
+
+---
+
+## Decision 014 — Default AI provider is OpenAI; provider selection goes through a composition root
+
+The default AI provider for Phase 1 is OpenAI, via the Responses API, using model `gpt-5-mini`. Anthropic/Claude is no longer the default provider, but `ai-adapter/claude-adapter.ts` is kept in the codebase as a legacy provider rather than deleted, in case it needs to be re-enabled or compared against later.
+
+Provider selection is centralized in `ai-adapter/index.ts`, which exports a single `activeProvider` constant typed as `AIProvider`. `core/planning-engine` depends only on this composition root, never on a concrete adapter (`openai-adapter.ts` or `claude-adapter.ts`) directly. This mirrors the existing `storage/index.ts` composition-root pattern used for the storage layer.
+
+Switching the default provider in the future means changing the one export in `ai-adapter/index.ts`. It should not require changes to `core/planning-engine`, `app/api/planning/route.ts`, the UI, or `storage/*`. This is the concrete mechanism behind Decision 008 (AI models are replaceable).
+
+If a higher-quality model is needed later, the documented upgrade path is `gpt-5-mini` → `gpt-5`, decided explicitly rather than implicitly.
+
+---
+
+## Decision 015 — Diagnostic logging across the planning call chain (debugging aid, not new architecture)
+
+To make failures in the route → planning-engine → ai-adapter chain debuggable, each layer logs to the server terminal with a layer-tagged prefix (`[route]`, `[planning-engine]`, `[openai-adapter]`) and, where available, a `requestId` generated once per request in `app/api/planning/route.ts`.
+
+This addition is diagnostic only:
+
+- `core/shared/logger.ts` is a minimal formatting helper (two functions: `logInfo`, `logError`), not a logging framework, and is not meant to evolve into one without a separate decision.
+- `requestId` is generated in the Route Handler and passed as an optional third argument to `generatePlan()`. It does not flow into `AIProvider.callModel()` — the provider interface is unchanged.
+- The OpenAI Adapter logs the model name, whether `OPENAI_API_KEY` is present, and distinguishes network failure, non-OK HTTP response, and response-parsing failure as three separate logged cases.
+- `/api/planning` error responses now include `error` (a short machine-readable code), `message` (human-readable detail), and `requestId`, in addition to the existing HTTP status code. This is an additive change to the error response shape; the success response shape (`{ rawText }`) is unchanged.
+
+This decision exists so future milestones don't need to re-litigate whether console logging is acceptable here — it is, as long as it stays this minimal and stays diagnostic (not used for analytics, not persisted, not user-facing beyond the existing error message in the UI).
+
+---
+
+## Decision 016 — Explicit proxy dispatcher in the OpenAI adapter (local dev environment workaround)
+
+In some local development environments, Node's `fetch` (built on `undici`) does not automatically use a local proxy (e.g. Clash) the way `curl` or a browser does, which can produce `UND_ERR_CONNECT_TIMEOUT` even though the network path itself is fine. To work around this, `ai-adapter/openai-adapter.ts` reads a proxy URL from the standard `HTTPS_PROXY` / `https_proxy` / `HTTP_PROXY` / `http_proxy` / `ALL_PROXY` / `all_proxy` environment variables (in that priority order) and, when one is present, constructs an `undici.ProxyAgent` and passes it as `fetch`'s `dispatcher` option.
+
+Scope and constraints of this change:
+
+- `undici` was added as a direct dependency (previously only available transitively through Next.js) specifically so `ProxyAgent` can be imported.
+- The dispatcher is resolved once and cached at module scope for the lifetime of the process; it is not re-created per request.
+- This logic is local to `openai-adapter.ts` only. It is not a generic networking utility and is not used by any other module. If a second adapter (or a future provider) needs the same behavior, it should get its own proxy resolution rather than importing this one, to keep adapters independent — re-evaluate this if proxy logic needs to be shared across 3+ adapters.
+- No proxy credentials or full proxy URLs are logged — only `proxyPresent` (boolean) and `proxyScheme` (e.g. `http`/`socks5`), consistent with Decision 015's diagnostic-logging-only intent.
+- If `HTTPS_PROXY`/etc. are not set, behavior is unchanged from before this decision: `fetch` connects directly with no dispatcher.
+
+This is treated as a local development environment accommodation, not a production networking requirement. It should be revisited if/when the project introduces a real deployment target where proxying is handled at the infrastructure level instead.
