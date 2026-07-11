@@ -16,7 +16,7 @@ Phase 1 — Adaptive Planning MVP
 - TypeScript
 - Tailwind CSS
 - IndexedDB
-- Claude API
+- AI Provider: DeepSeek (Chat Completions API), via a pluggable provider abstraction — see `ai-adapter/`
 
 ## Documentation
 

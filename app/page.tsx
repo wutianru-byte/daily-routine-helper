@@ -42,7 +42,7 @@ export default function DashboardPage() {
         <h1 className="text-lg font-semibold text-neutral-900">Dashboard</h1>
         <p className="text-sm text-neutral-500">
           M1 milestone: this button verifies the full chain — front end → API
-          route → planning engine → Claude adapter → Claude API.
+          route → planning engine → AI provider adapter → AI provider API.
         </p>
       </div>
 
@@ -51,7 +51,7 @@ export default function DashboardPage() {
         disabled={loading}
         className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
       >
-        {loading ? "Calling Claude..." : "Test planning call"}
+        {loading ? "Calling AI provider..." : "Test planning call"}
       </button>
 
       {error && (

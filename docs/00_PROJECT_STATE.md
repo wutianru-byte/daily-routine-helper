@@ -6,11 +6,11 @@ Last Updated: M1 Complete
 
 # Current Status
 
-The project has successfully completed **Milestone 1 (Project Initialization)**.
+The project has successfully completed **Milestone 1 (Project Initialization & OpenAI Integration)**.
 
-The product has transitioned from product design into software implementation.
+The product has transitioned from architecture validation into functional feature development.
 
-The project now contains a fully defined product specification, roadmap, architecture, execution plan, engineering workflow, and an initial working application.
+The complete planning request chain was successfully verified using the OpenAI Responses API at M1 completion. The active provider has since changed — see "AI Provider Status" below and Decision 017 for the current provider.
 
 ---
 
@@ -42,6 +42,8 @@ Completed:
 
 Development now follows a standard Git workflow.
 
+M1 has been committed to GitHub and tagged as the stable baseline for future development.
+
 ---
 
 # M1 Implementation Status
@@ -57,9 +59,10 @@ Verified:
 * Planning Engine architecture implemented
 * Provider abstraction implemented
 * API routing implemented
-* Full planning request chain verified
+* OpenAI Responses API integration verified
+* End-to-end planning request chain verified
 
-Current chain:
+Current chain (as of the DeepSeek migration — see Decision 017):
 
 Client
 
@@ -77,32 +80,36 @@ AI Provider
 
 ↓
 
-LLM
+DeepSeek Chat Completions API
+
+↓
+
+Response Rendering
+
+Note: at M1 completion, this chain ran through the OpenAI Responses API, as recorded in "M1 Implementation Status" below. The chain has since been switched to DeepSeek without changing Route Handler, Planning Engine, or UI — the M1 verification below documents that milestone's actual state and is left as-is.
 
 ---
 
 # AI Provider Status
 
-Original Provider:
+Default Provider:
 
-Anthropic Claude API
+DeepSeek Chat Completions API
 
-Current Issue:
+Status:
 
-* Anthropic Platform unavailable in current region.
-* API requests return HTTP 403 ("Request not allowed").
+Switched (see Decision 017); pending live re-verification with a real `DEEPSEEK_API_KEY`
 
-Decision:
+Model:
 
-Phase 1 will migrate to OpenAI as the default provider.
+deepseek-chat
 
-Architecture will remain provider-independent.
+Notes:
 
-Provider switching is implemented through the AI Provider abstraction.
-
-Target model:
-
-GPT-5 mini
+* OpenAI provider (`ai-adapter/openai-adapter.ts`) remains in the repository as a legacy implementation.
+* Anthropic/Claude provider (`ai-adapter/claude-adapter.ts`) remains in the repository as a legacy implementation.
+* DeepSeek is now the default provider, selected via the `ai-adapter/index.ts` composition root.
+* Provider abstraction has now been validated across two provider swaps (Anthropic → OpenAI, OpenAI → DeepSeek).
 
 ---
 
@@ -123,20 +130,29 @@ Important architecture principles now validated:
 
 Current milestone:
 
-Phase 1
+M1 Complete
+
+Next milestone:
+
+Phase 2
 
 Status:
 
 Implementation Complete
 
-Pending:
+Completed:
 
 * Configure OPENAI_API_KEY
 * Verify OpenAI integration
 * Complete first successful planning generation
-* Begin real-world dogfooding
+* Validate provider abstraction
+* Validate full end-to-end request chain
 
-Phase 2 has NOT started.
+Next:
+
+* Replace the smoke-test prompt with the real planning prompt.
+* Begin real-world dogfooding.
+* Start Phase 2 feature development.
 
 ---
 
@@ -184,10 +200,22 @@ Every milestone should produce a usable product.
 
 Immediate objective:
 
-Complete OpenAI provider integration.
+Begin Phase 2.
 
-Verify successful planning generation.
+Replace the smoke-test prompt with the production planning prompt.
 
-Use the application for the first real daily planning session.
+Generate structured daily plans using real user context.
 
-Do NOT begin Phase 2 until the planning workflow has been validated through real daily use.
+Begin continuous dogfooding with real daily planning data.
+
+---
+
+# Lessons Learned (M1)
+
+Milestone 1 uncovered several important engineering lessons:
+
+* Provider abstraction successfully reduced migration cost from Anthropic to OpenAI.
+* End-to-end validation should always be completed before feature expansion.
+* Node.js networking behavior differs from browser networking and may require explicit proxy configuration in development environments.
+* The OpenAI Responses API was verified as a working provider interface at M1, but "long-term" did not hold — it was replaced by DeepSeek shortly after (Decision 017). The reusable lesson is that the composition root (Decision 014) is what keeps provider swaps cheap, not any one provider's permanence.
+* Proxy configuration should be validated independently from application logic when diagnosing API connectivity issues.

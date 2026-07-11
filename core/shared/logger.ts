@@ -6,7 +6,12 @@
 // console.log/error format so each layer's output is easy to tell apart
 // in the terminal.
 
-type Layer = "route" | "planning-engine" | "openai-adapter";
+// Includes tags for every concrete AI provider adapter that exists in the
+// codebase (active or legacy), not just the currently active one — adapters
+// that are kept around as legacy (e.g. openai-adapter.ts, claude-adapter.ts
+// per Decision 014) still need to type-check even when unreferenced by the
+// composition root.
+type Layer = "route" | "planning-engine" | "openai-adapter" | "deepseek-adapter";
 
 function prefix(layer: Layer, requestId?: string): string {
   return requestId ? `[${layer}][${requestId}]` : `[${layer}]`;

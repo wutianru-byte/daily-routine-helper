@@ -5,18 +5,19 @@
 // module (core/planning-engine, and anything else that needs to call a
 // model) should import `activeProvider` from here and use it through the
 // AIProvider interface — never import a concrete adapter (claude-adapter,
-// openai-adapter) directly.
+// openai-adapter, deepseek-adapter) directly.
 //
 // This mirrors storage/index.ts's pattern and is the concrete mechanism
 // behind Decision 008 (AI models are replaceable): switching providers
 // means changing the one line below, not touching planning-engine, route,
 // UI, or storage.
 //
-// Current default: OpenAI (gpt-5-mini). claude-adapter.ts is kept in the
-// codebase as a legacy provider and can be re-enabled by changing the
+// Current default: DeepSeek (deepseek-chat), via its OpenAI-compatible Chat
+// Completions API. openai-adapter.ts and claude-adapter.ts are kept in the
+// codebase as legacy providers and can be re-enabled by changing the
 // import/export below.
 
 import { AIProvider } from "./provider.interface";
-import { openaiAdapter } from "./openai-adapter";
+import { deepseekAdapter } from "./deepseek-adapter";
 
-export const activeProvider: AIProvider = openaiAdapter;
+export const activeProvider: AIProvider = deepseekAdapter;

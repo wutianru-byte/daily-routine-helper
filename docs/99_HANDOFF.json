@@ -1,0 +1,145 @@
+{
+  "project": "Daily Routine Helper",
+  "version": "M1 Complete",
+  "last_updated": "After DeepSeek provider migration (Decision 017); OpenAI Responses API integration verification remains accurate as an M1-era historical record below",
+
+  "current_status": {
+    "milestone": "M1 Complete",
+    "phase": "Ready for Phase 2",
+    "architecture_verified": true,
+    "end_to_end_verified": true
+  },
+
+  "completed": {
+    "architecture": [
+      "Planning Engine implemented",
+      "Provider abstraction implemented",
+      "Storage abstraction implemented",
+      "Business logic decoupled from UI"
+    ],
+    "frontend": [
+      "Dashboard",
+      "Goals",
+      "Review",
+      "Settings"
+    ],
+    "backend": [
+      "API Route",
+      "Planning Engine",
+      "OpenAI Provider",
+      "OpenAI Responses API integration"
+    ],
+    "verification": [
+      "OpenAI API Key configured",
+      "OpenAI Responses API successfully called",
+      "End-to-end request chain verified",
+      "UI successfully received OpenAI response"
+    ]
+  },
+
+  "major_debugging_history": [
+    {
+      "problem": "Anthropic API unavailable (HTTP 403)",
+      "solution": "Migrated provider implementation to OpenAI Responses API"
+    },
+    {
+      "problem": "Insufficient server-side diagnostics",
+      "solution": "Added layered logging in Route, Planning Engine and OpenAI Adapter"
+    },
+    {
+      "problem": "Node fetch timed out while browser access worked",
+      "solution": "Identified that the development terminal was not using the proxy"
+    },
+    {
+      "problem": "curl worked but Node fetch still timed out",
+      "solution": "Configured HTTPS_PROXY / HTTP_PROXY / ALL_PROXY for the development environment"
+    },
+    {
+      "problem": "UND_ERR_INVALID_ARG (invalid onRequestStart method)",
+      "solution": "Unified fetch and ProxyAgent to use the same undici implementation instead of mixing Node built-in fetch with npm undici"
+    }
+  ],
+
+  "current_provider": {
+    "default": "DeepSeek",
+    "api": "Chat Completions API (OpenAI-compatible)",
+    "model": "deepseek-chat",
+    "status": "Switched via Decision 017; pending live re-verification with a real DEEPSEEK_API_KEY",
+    "legacy_providers": ["OpenAI (ai-adapter/openai-adapter.ts)", "Anthropic/Claude (ai-adapter/claude-adapter.ts)"]
+  },
+
+  "current_request_chain": [
+    "Browser",
+    "Next.js Route",
+    "Planning Engine",
+    "AI Provider",
+    "DeepSeek Chat Completions API",
+    "Response Rendering"
+  ],
+
+  "documents": {
+    "source_of_truth": [
+      "00_PROJECT_STATE.md",
+      "01_PRD.md",
+      "02_ROADMAP.md",
+      "03_SYSTEM_ARCHITECTURE.md",
+      "04_PHASE1_EXECUTION_PLAN.md",
+      "05_DECISIONS.md"
+    ],
+    "decision_count": 17
+  },
+
+  "engineering_notes": [
+    "Provider abstraction successfully minimized migration cost from Anthropic to OpenAI, and again from OpenAI to DeepSeek.",
+    "End-to-end validation was completed before expanding product functionality.",
+    "Node.js networking differs from browser networking and requires independent validation.",
+    "Proxy configuration should always be verified separately from application logic.",
+    "The OpenAI Responses API was validated as a working provider interface at M1, but was not the long-term provider — DeepSeek is now the default (Decision 017). Provider swaps should be expected to recur; the composition root is what makes them cheap, not any one provider's permanence."
+  ],
+
+  "repository": {
+    "github_synced": true,
+    "m1_committed": true,
+    "m1_pushed": true
+  },
+
+  "known_limitations": [
+    "Current planning generation still uses the temporary smoke-test prompt.",
+    "Production-quality planning prompt has not yet been implemented.",
+    "DEEPSEEK_API_KEY in .env.local is currently a placeholder (empty) — live success-path and error-path verification against the real DeepSeek API is still pending."
+  ],
+
+  "next_objectives": [
+    "Begin Phase 2",
+    "Replace the smoke-test prompt with the production planning prompt",
+    "Implement structured daily planning generation",
+    "Improve prompt engineering",
+    "Begin real-world dogfooding",
+    "Iteratively refine planning quality"
+  ],
+
+  "collaboration": {
+    "chatgpt": [
+      "Product Design",
+      "Architecture",
+      "Roadmap",
+      "Technical Review",
+      "Planning Logic",
+      "Product Decisions"
+    ],
+    "claude": [
+      "Implementation",
+      "Refactoring",
+      "Bug Fixes",
+      "Code Review"
+    ]
+  },
+
+  "important_context": [
+    "Keep the existing architecture stable.",
+    "Do not redesign the Provider abstraction.",
+    "Focus Phase 2 on product capability rather than infrastructure.",
+    "Discuss architecture before implementation changes.",
+    "Treat the project documentation as the source of truth."
+  ]
+}

@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result);
   } catch (error) {
     // Full error object goes to the terminal so the real cause (missing key,
-    // bad model name, OpenAI error body, parsing failure, etc.) is visible.
+    // bad model name, provider error body, parsing failure, etc.) is visible.
     logError("route", "generatePlan threw", error, requestId);
 
     const message = error instanceof Error ? error.message : "Unknown error";

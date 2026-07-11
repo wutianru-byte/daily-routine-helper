@@ -161,14 +161,33 @@ This decision exists so future milestones don't need to re-litigate whether cons
 
 ## Decision 016 — Explicit proxy dispatcher in the OpenAI adapter (local dev environment workaround)
 
-In some local development environments, Node's `fetch` (built on `undici`) does not automatically use a local proxy (e.g. Clash) the way `curl` or a browser does, which can produce `UND_ERR_CONNECT_TIMEOUT` even though the network path itself is fine. To work around this, `ai-adapter/openai-adapter.ts` reads a proxy URL from the standard `HTTPS_PROXY` / `https_proxy` / `HTTP_PROXY` / `http_proxy` / `ALL_PROXY` / `all_proxy` environment variables (in that priority order) and, when one is present, constructs an `undici.ProxyAgent` and passes it as `fetch`'s `dispatcher` option.
+In some local development environments, Node's `fetch` does not automatically use a local proxy (e.g. Clash) the way `curl` or a browser does, which can produce `UND_ERR_CONNECT_TIMEOUT` even though the network path itself is fine. To work around this, `ai-adapter/openai-adapter.ts` reads a proxy URL from the standard `HTTPS_PROXY` / `https_proxy` / `HTTP_PROXY` / `http_proxy` / `ALL_PROXY` / `all_proxy` environment variables (in that priority order) and, when one is present, constructs an `undici.ProxyAgent` and passes it as `fetch`'s `dispatcher` option.
+
+A real pitfall was hit and fixed during this work: Node's built-in global `fetch` bundles its own internal copy of `undici`, which is a different module instance (and can be a different version) from the `undici` package installed in `node_modules`. Passing a `Dispatcher`/`ProxyAgent` created from the npm package into the *global* `fetch` fails with `UND_ERR_INVALID_ARG: invalid onRequestStart method`, even when the request object (headers, body, dispatcher) is structurally correct — the error looks like a malformed request but is actually a cross-version incompatibility. The fix is to import `fetch` from the `undici` package itself and use that, not the global one, so `fetch` and `ProxyAgent` always come from the same module instance.
 
 Scope and constraints of this change:
 
-- `undici` was added as a direct dependency (previously only available transitively through Next.js) specifically so `ProxyAgent` can be imported.
+- `undici` was added as a direct dependency (previously only available transitively through Next.js) specifically so `ProxyAgent` (and now `fetch`) can be imported from the same module instance.
 - The dispatcher is resolved once and cached at module scope for the lifetime of the process; it is not re-created per request.
+- `openai-adapter.ts` uses `undici`'s own `fetch`, not Node's global `fetch`, for all of its requests (not only when a proxy is configured) so behavior is consistent whether or not a proxy is set.
 - This logic is local to `openai-adapter.ts` only. It is not a generic networking utility and is not used by any other module. If a second adapter (or a future provider) needs the same behavior, it should get its own proxy resolution rather than importing this one, to keep adapters independent — re-evaluate this if proxy logic needs to be shared across 3+ adapters.
 - No proxy credentials or full proxy URLs are logged — only `proxyPresent` (boolean) and `proxyScheme` (e.g. `http`/`socks5`), consistent with Decision 015's diagnostic-logging-only intent.
-- If `HTTPS_PROXY`/etc. are not set, behavior is unchanged from before this decision: `fetch` connects directly with no dispatcher.
+- If `HTTPS_PROXY`/etc. are not set, behavior is functionally unchanged from before this decision: no dispatcher is passed and the request connects directly — only the underlying fetch implementation (undici's vs Node's global) differs, which is not expected to be user-visible.
 
 This is treated as a local development environment accommodation, not a production networking requirement. It should be revisited if/when the project introduces a real deployment target where proxying is handled at the infrastructure level instead.
+
+---
+
+## Decision 017 — Default AI provider is now DeepSeek; OpenAI and Claude are both legacy
+
+The default AI provider is now DeepSeek, via its OpenAI-compatible Chat Completions API, using model `deepseek-chat`. OpenAI is no longer the default provider — `ai-adapter/openai-adapter.ts` and `ai-adapter/claude-adapter.ts` are both kept in the codebase as legacy providers rather than deleted, in case either needs to be re-enabled or compared against later. This extends Decision 014's provider-selection mechanism; it does not change it.
+
+Switching was done entirely through the existing composition root: `ai-adapter/index.ts`'s `activeProvider` now points at `deepseekAdapter` instead of `openaiAdapter`. `core/planning-engine`, `app/api/planning/route.ts`, the UI, and `storage/*` were not touched, confirming Decision 008/014's replaceability claim in practice for a second provider swap.
+
+Response shape: DeepSeek's Chat Completions endpoint returns `choices[0].message.content`, structurally different from the OpenAI **Responses API** shape (`output[].content[].output_text`) that `openai-adapter.ts` parses. `deepseek-adapter.ts` has its own parsing logic; it does not and should not reuse `openai-adapter.ts`'s response parsing.
+
+Environment variable: the new adapter reads `DEEPSEEK_API_KEY`, following the same "AI Provider key, not provider-specific policy" framing as Decision 012. `OPENAI_API_KEY` and `ANTHROPIC_API_KEY` are left in `.env.local` for now (unused by the active provider, not deleted) — removing unused legacy keys is a separate cleanup decision, not part of this switch.
+
+Proxy: Decision 016's `undici`/`ProxyAgent` workaround is **not** copied into `deepseek-adapter.ts`. That workaround existed specifically because OpenAI was often unreachable without a proxy in some dev environments; DeepSeek has not been shown to have the same problem and was verified against a direct connection first, per Decision 016's own guidance that this logic is local to `openai-adapter.ts` and should not be shared preemptively. If a specific environment genuinely cannot reach DeepSeek directly, add an explicit, opt-in proxy branch to `deepseek-adapter.ts` rather than importing or duplicating `openai-adapter.ts`'s always-on detection.
+
+Logging: `core/shared/logger.ts`'s `Layer` type gained a `"deepseek-adapter"` tag alongside the existing `"openai-adapter"` tag (kept because `openai-adapter.ts` remains in the codebase and must still type-check). This is consistent with Decision 015 — diagnostic logging only, no behavior change to the provider interface.
